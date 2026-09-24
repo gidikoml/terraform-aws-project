@@ -1,5 +1,7 @@
 stages:
   - test
+  - validate
+  - plan
 
 test_aws_connection:
   stage: test
@@ -27,3 +29,15 @@ test_aws_connection:
       export AWS_SESSION_TOKEN=$(echo "$CREDS" | awk '{print $3}')
 
       aws sts get-caller-identity
+
+terraform_validate:
+  stage: validate
+
+  image:
+    name: hashicorp/terraform:latest
+    entrypoint: [""]
+
+  script:
+    - terraform --version
+    - terraform init
+    - terraform validate
