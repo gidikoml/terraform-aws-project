@@ -3,6 +3,9 @@ stages:
   - validate
   - plan
 
+variables:
+  TF_STATE_NAME: "terraform-aws-project"
+
 
 test_aws_connection:
   stage: test
@@ -41,7 +44,16 @@ terraform_validate:
 
   script:
     - terraform --version
-    - terraform init
+    - |
+      terraform init \
+        -backend-config="address=${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/terraform/state/${TF_STATE_NAME}" \
+        -backend-config="lock_address=${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/terraform/state/${TF_STATE_NAME}/lock" \
+        -backend-config="unlock_address=${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/terraform/state/${TF_STATE_NAME}/lock" \
+        -backend-config="username=gitlab-ci-token" \
+        -backend-config="password=${CI_JOB_TOKEN}" \
+        -backend-config="lock_method=POST" \
+        -backend-config="unlock_method=DELETE" \
+        -backend-config="retry_wait_min=5"
     - terraform validate
 
 
@@ -74,5 +86,20 @@ terraform_plan:
       aws sts get-caller-identity
 
   script:
-    - terraform init
-    - terraform plan
+    - |
+      terraform init \
+        -backend-config="address=${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/terraform/state/${TF_STATE_NAME}" \
+        -backend-config="lock_address=${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/terraform/state/${TF_STATE_NAME}/lock" \
+        -backend-config="unlock_address=${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/terraform/state/${TF_STATE_NAME}/lock" \
+        -backend-config="username=gitlab-ci-token" \
+        -backend-config="password=${CI_JOB_TOKEN}" \
+        -backend-config="lock_method=POST" \
+        -backend-config="unlock_method=DELETE" \
+        -backend-config="retry_wait_min=5"
+
+    - terraform plan -out=tfplan
+
+  artifacts:
+    paths:
+      - tfplan
+    expire_in: 1 day
