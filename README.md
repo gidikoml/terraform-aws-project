@@ -1,93 +1,341 @@
-# terraform-aws-project
+# Terraform AWS Infrastructure with GitLab CI/CD
 
+## Overview
 
+This project demonstrates how to provision AWS infrastructure using **Terraform** and automate the Terraform workflow through a **GitLab CI/CD pipeline**.
 
-## Getting started
+The project uses **GitLab OIDC (OpenID Connect)** to authenticate securely to AWS without storing permanent AWS access keys in the repository.
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+Terraform state is stored remotely using **GitLab-managed Terraform state**, allowing the CI/CD pipeline to maintain infrastructure state between jobs.
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+> This project is intended for DevOps / Cloud Engineering learning and portfolio demonstration.
 
-## Add your files
+---
 
-* [Create](https://docs.gitlab.com/user/project/repository/web_editor/#create-a-file) or [upload](https://docs.gitlab.com/user/project/repository/web_editor/#upload-a-file) files
-* [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
+## Technologies Used
 
+- Terraform
+- Amazon Web Services (AWS)
+- Amazon EC2
+- AWS IAM
+- AWS Systems Manager Parameter Store
+- GitLab CI/CD
+- GitLab OIDC
+- GitLab-managed Terraform State
+- Git
+- GitHub
+
+---
+
+## Architecture
+
+```text
+Developer
+    |
+    | git push
+    v
+GitLab Repository
+    |
+    v
+GitLab CI/CD Pipeline
+    |
+    +---- Test AWS Connection
+    |
+    +---- Terraform Validate
+    |
+    +---- Terraform Plan
+    |
+    +---- Terraform Apply (Manual)
+              |
+              | OIDC Authentication
+              v
+         AWS IAM Role
+              |
+              v
+          Terraform
+              |
+              v
+            AWS EC2
 ```
-cd existing_repo
-git remote add origin https://gitlab.com/mams-group1/terraform-aws-project.git
-git branch -M main
-git push -uf origin main
+
+Terraform state is stored remotely:
+
+```text
+Terraform
+    |
+    v
+GitLab Managed Terraform State
 ```
 
-## Integrate with your tools
+---
 
-* [Set up project integrations](https://gitlab.com/mams-group1/terraform-aws-project/-/settings/integrations)
+## CI/CD Pipeline
 
-## Collaborate with your team
+The GitLab pipeline contains four stages:
 
-* [Invite team members and collaborators](https://docs.gitlab.com/user/project/members/)
-* [Create a new merge request](https://docs.gitlab.com/user/project/merge_requests/creating_merge_requests/)
-* [Automatically close issues from merge requests](https://docs.gitlab.com/user/project/issues/managing_issues/#closing-issues-automatically)
-* [Enable merge request approvals](https://docs.gitlab.com/user/project/merge_requests/approvals/)
-* [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+```text
+test
+  |
+  v
+validate
+  |
+  v
+plan
+  |
+  v
+apply
+```
 
-## Test and Deploy
+### 1. Test AWS Connection
 
-Use the built-in continuous integration in GitLab.
+The pipeline obtains a GitLab OIDC token and uses AWS STS to assume an IAM role.
 
-* [Get started with GitLab CI/CD](https://docs.gitlab.com/ci/quick_start/)
-* [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/user/application_security/sast/)
-* [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/topics/autodevops/requirements/)
-* [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/user/clusters/agent/)
-* [Set up protected environments](https://docs.gitlab.com/ci/environments/protected_environments/)
+The connection is verified with:
 
-***
+```bash
+aws sts get-caller-identity
+```
 
-# Editing this README
+No permanent AWS access key or secret access key is stored in the repository.
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+### 2. Terraform Validate
 
-## Suggestions for a good README
+Terraform initializes the GitLab HTTP backend and validates the Terraform configuration.
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+```bash
+terraform init
+terraform validate
+```
 
-## Name
-Choose a self-explaining name for your project.
+### 3. Terraform Plan
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+Terraform authenticates to AWS and generates an execution plan.
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+```bash
+terraform plan
+```
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+This allows infrastructure changes to be reviewed before deployment.
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+### 4. Terraform Apply
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+The apply stage is configured as a **manual job**.
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+```bash
+terraform plan -out=tfplan-apply
+terraform apply -auto-approve tfplan-apply
+```
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+Infrastructure is therefore not automatically created simply because code is pushed to the repository.
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+---
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+## Secure AWS Authentication with OIDC
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+Instead of storing long-lived AWS credentials in GitLab, this project uses:
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+```text
+GitLab CI/CD
+     |
+     | OIDC Token
+     v
+AWS Security Token Service (STS)
+     |
+     | AssumeRoleWithWebIdentity
+     v
+AWS IAM Role
+     |
+     v
+Temporary AWS Credentials
+```
 
-## License
-For open source projects, say how it is licensed.
+The temporary credentials are then used by Terraform during the pipeline.
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+This approach reduces the need for long-lived cloud credentials in CI/CD.
+
+---
+
+## Terraform Remote State
+
+Terraform uses GitLab-managed Terraform state through the HTTP backend.
+
+```hcl
+terraform {
+  backend "http" {
+  }
+}
+```
+
+The backend configuration is supplied by the GitLab CI/CD pipeline during `terraform init`.
+
+This allows Terraform state to persist between pipeline jobs without committing state files to Git.
+
+---
+
+## EC2 Infrastructure
+
+The project retrieves the latest Amazon Linux 2023 AMI using AWS Systems Manager Parameter Store:
+
+```hcl
+data "aws_ssm_parameter" "amazon_linux_2023" {
+  name = "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64"
+}
+```
+
+The EC2 instance configuration is:
+
+```hcl
+resource "aws_instance" "my_ec2" {
+  ami           = data.aws_ssm_parameter.amazon_linux_2023.value
+  instance_type = "t3.micro"
+
+  tags = {
+    Name = "terraform-ec2"
+  }
+}
+```
+
+AWS Region:
+
+```text
+us-east-1
+```
+
+---
+
+## Repository Structure
+
+```text
+terraform-aws-project/
+|
+|-- .gitlab-ci.yml
+|-- ec2.tf
+|-- provider.tf
+|-- README.md
+```
+
+### Files
+
+**`.gitlab-ci.yml`**
+
+Defines the GitLab CI/CD pipeline, AWS OIDC authentication, Terraform initialization, validation, planning, and manual apply workflow.
+
+**`provider.tf`**
+
+Defines the AWS Terraform provider and HTTP remote-state backend.
+
+**`ec2.tf`**
+
+Defines the Amazon Linux AMI lookup and EC2 infrastructure.
+
+**`README.md`**
+
+Contains project documentation.
+
+---
+
+## Security Practices
+
+This project demonstrates several infrastructure security practices:
+
+- No AWS access keys committed to Git
+- OIDC-based AWS authentication
+- Temporary AWS credentials through AWS STS
+- IAM role-based access
+- Remote Terraform state
+- Manual infrastructure deployment
+- Infrastructure defined as code
+- Separation between planning and deployment
+
+---
+
+## Local Terraform Commands
+
+Initialize Terraform:
+
+```bash
+terraform init
+```
+
+Validate the configuration:
+
+```bash
+terraform validate
+```
+
+Review infrastructure changes:
+
+```bash
+terraform plan
+```
+
+Deploy infrastructure:
+
+```bash
+terraform apply
+```
+
+Destroy Terraform-managed infrastructure when it is no longer required:
+
+```bash
+terraform destroy
+```
+
+> Running `terraform apply` can create real AWS resources and may consume AWS credits or incur charges.
+
+---
+
+## Git Workflow
+
+The project is maintained in GitLab and mirrored to GitHub for portfolio visibility.
+
+Push changes to GitLab:
+
+```bash
+git push origin main
+```
+
+Push the same changes to GitHub:
+
+```bash
+git push github main
+```
+
+---
+
+## Project Status
+
+The Terraform configuration, GitLab CI/CD pipeline, OIDC authentication, and remote state integration have been configured and tested.
+
+The pipeline can successfully:
+
+- Authenticate GitLab to AWS using OIDC
+- Initialize the GitLab Terraform remote backend
+- Validate Terraform configuration
+- Generate an AWS infrastructure plan
+
+The AWS EC2 deployment currently depends on the AWS account being authorized to launch EC2 resources.
+
+---
+
+## Future Improvements
+
+Planned improvements include:
+
+- Add a manual Terraform destroy pipeline stage
+- Add networking resources such as VPC and security groups
+- Add Terraform variables and outputs
+- Modularize Terraform configuration
+- Add additional security scanning
+- Add infrastructure monitoring
+- Expand the project to support multiple environments
+
+---
+
+## Author
+
+**Komlavi Gidi**
+
+DevOps / Cloud / Platform Engineering
+
+GitHub: `gidikoml`
